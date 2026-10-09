@@ -1,0 +1,14 @@
+# ==================================================
+# ID      : 50
+# Name    : pipeline_standard
+# Version : 2.0
+# File    : .gitlab-ci/includes/50_pipeline_standard.yml
+# ==================================================
+
+workflow:
+
+  rules:
+
+    - if: '$CI_COMMIT_TAG'
+
+    

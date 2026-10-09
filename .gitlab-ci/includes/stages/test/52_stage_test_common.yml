@@ -1,0 +1,170 @@
+# .gitlab-ci/includes/stages/test/52_stage_test_common.yml # 共通Validate・UnitTest処理
+# ==================================================
+# ID      : 52
+# Name    : stage_test_common
+# Version : 2.0
+# File    : .gitlab-ci/includes/stages/test/52_stage_test_common.yml
+# Purpose :
+#   Validate Stage
+#   Unit Test Stage
+# ==================================================
+
+# --------------------------------------
+# Validate
+# --------------------------------------
+
+validate:
+
+  stage: validate
+
+  script:
+
+    - echo "===================================="
+    - echo "Validate Started"
+    - echo "APP_NAME=${APP_NAME}"
+    - echo "APP_TYPE=${APP_TYPE}"
+    - echo "===================================="
+
+    - test -n "${APP_NAME}"
+
+    - test -n "${APP_TYPE}"
+
+    - |
+
+      case "${APP_TYPE}" in
+
+        tomcat|springboot|nodejs|python|was|liberty)
+
+          echo "APP_TYPE Validation Passed"
+
+          ;;
+
+        *)
+
+          echo "Unsupported APP_TYPE=${APP_TYPE}"
+
+          exit 1
+
+          ;;
+
+      esac
+
+    - echo "Validate Finished"
+
+  rules:
+
+    - if: '$CI_COMMIT_TAG'
+
+    - if: '$CI_COMMIT_BRANCH == "master"'
+
+    - if: '$CI_COMMIT_BRANCH =~ /^feature\/.*/'
+
+# --------------------------------------
+# Unit Test Base
+# --------------------------------------
+
+.unit-test-base:
+
+  stage: unit_test
+
+  needs:
+
+    - build
+
+  artifacts:
+
+    when: always
+
+    expire_in: 30 days
+
+    paths:
+
+      - reports/
+
+      - test-results/
+
+      - coverage/
+
+  script:
+
+    - echo "===================================="
+
+    - echo "Unit Test Started"
+
+    - echo "APP_NAME=${APP_NAME}"
+
+    - echo "APP_TYPE=${APP_TYPE}"
+
+    - echo "===================================="
+
+    - chmod +x .gitlab-ci/scripts/test/**/* 2>/dev/null || true
+
+    - |
+
+      case "${APP_TYPE}" in
+
+        tomcat)
+
+          ./.gitlab-ci/scripts/test/java/81_lang_tomcat_test.sh
+
+          ;;
+
+        springboot)
+
+          ./.gitlab-ci/scripts/test/java/82_lang_springboot_test.sh
+
+          ;;
+
+        nodejs)
+
+          ./.gitlab-ci/scripts/test/nodejs/83_lang_nodejs_test.sh
+
+          ;;
+
+        python)
+
+          ./.gitlab-ci/scripts/test/python/84_lang_python_test.sh
+
+          ;;
+
+        was)
+
+          ./.gitlab-ci/scripts/test/was/85_lang_was_test.sh
+
+          ;;
+
+        liberty)
+
+          ./.gitlab-ci/scripts/test/was/86_lang_liberty_test.sh
+
+          ;;
+
+        *)
+
+          echo "Unsupported APP_TYPE=${APP_TYPE}"
+
+          exit 1
+
+          ;;
+
+      esac
+
+    - echo "Unit Test Finished"
+
+# --------------------------------------
+# Unit Test
+# --------------------------------------
+
+unit_test:
+
+  extends:
+
+    - .unit-test-base
+
+  rules:
+
+    - if: '$CI_COMMIT_TAG'
+
+    - if: '$CI_COMMIT_BRANCH == "master"'
+
+    - if: '$CI_COMMIT_BRANCH =~ /^feature\/.*/'

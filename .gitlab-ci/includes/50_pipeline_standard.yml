@@ -1,0 +1,209 @@
+# .gitlab-ci/includes/50_pipeline_standard.yml # Pipeline全体定義(Workflow / Stages / Variables / Include)
+# ==================================================
+# ID      : 50
+# Name    : pipeline_standard
+# Version : 2.0
+# File    : .gitlab-ci/includes/50_pipeline_standard.yml
+# Purpose :
+#   Pipeline Root Template
+#   Workflow / Stages / Variables / Include Control
+# ==================================================
+
+workflow:
+
+  rules:
+
+    # Release Tag
+
+    - if: '$CI_COMMIT_TAG'
+
+    # Main Branch
+
+    - if: '$CI_COMMIT_BRANCH == "master"'
+
+    # Feature Branch
+
+    - if: '$CI_COMMIT_BRANCH =~ /^feature\/.*/'
+
+    # Reject Others
+
+    - when: never
+
+default:
+
+  retry: 2
+
+  interruptible: true
+
+  timeout: 20m
+
+  artifacts:
+
+    when: always
+
+    expire_in: 30 days
+
+# ==================================================
+# Stage Definition
+# ==================================================
+
+stages:
+
+  - validate
+
+  - build
+
+  - unit_test
+
+  - package
+
+  - staging
+
+  - e2e
+
+  - performance
+
+  - security
+
+  - deploy
+
+  - release
+
+  - cleanup
+
+  - notify
+
+# ==================================================
+# Global Variables
+# ==================================================
+
+variables:
+
+  # ------------------------------------
+  # Pipeline
+  # ------------------------------------
+
+  PIPELINE_ID: "50"
+
+  PIPELINE_VERSION: "2.0"
+
+  # ------------------------------------
+  # Application
+  # ------------------------------------
+
+  APP_NAME: ""
+
+  APP_TYPE: ""
+
+  # Supported Values:
+  #
+  # tomcat
+  # springboot
+  # nodejs
+  # python
+  # was
+  # liberty
+
+  # ------------------------------------
+  # HealthCheck
+  # ------------------------------------
+
+  HEALTHCHECK_URL: ""
+
+  DEPLOY_HEALTHCHECK_URL: ""
+
+  # ------------------------------------
+  # Deploy
+  # ------------------------------------
+
+  DEPLOY_ENV: ""
+
+  DEPLOY_URL: ""
+
+  # ------------------------------------
+  # Release
+  # ------------------------------------
+
+  RELEASE_VERSION: ""
+
+  # ------------------------------------
+  # Security
+  # ------------------------------------
+
+  SECURITY_GATE_ENABLED: "true"
+
+  # ------------------------------------
+  # Performance
+  # ------------------------------------
+
+  PERFORMANCE_GATE_ENABLED: "true"
+
+  # ------------------------------------
+  # Cleanup
+  # ------------------------------------
+
+  CLEANUP_ENABLED: "true"
+
+  # ------------------------------------
+  # Notification
+  # ------------------------------------
+
+  NOTIFY_ENABLED: "true"
+
+  NOTIFY_MAIL_TO: ""
+
+  NOTIFY_TEAMS_WEBHOOK: ""
+
+  # ------------------------------------
+  # Manual Controls
+  # ------------------------------------
+
+  MANUAL_DEPLOY_ENABLED: "true"
+
+  MANUAL_RELEASE_ENABLED: "true"
+
+  MANUAL_PERFORMANCE_ENABLED: "false"
+
+  MANUAL_SECURITY_ENABLED: "false"
+
+# ==================================================
+# Include Standard Stages
+# ==================================================
+
+include:
+
+  # Build
+
+  - local: '.gitlab-ci/includes/stages/build/51_stage_build_common.yml'
+
+  # Test
+
+  - local: '.gitlab-ci/includes/stages/test/52_stage_test_common.yml'
+
+  # E2E
+
+  - local: '.gitlab-ci/includes/stages/e2e/53_stage_e2e_common.yml'
+
+  # Security
+
+  - local: '.gitlab-ci/includes/stages/security/54_stage_security_common.yml'
+
+  # Performance
+
+  - local: '.gitlab-ci/includes/stages/performance/55_stage_performance_common.yml'
+
+  # Deploy
+
+  - local: '.gitlab-ci/includes/stages/deploy/56_stage_deploy_common.yml'
+
+  # Release
+
+  - local: '.gitlab-ci/includes/stages/release/57_stage_release_common.yml'
+
+  # Cleanup
+
+  - local: '.gitlab-ci/includes/stages/cleanup/58_stage_cleanup_common.yml'
+
+  # Notification
+
+  - local: '.gitlab-ci/includes/stages/notify/59_stage_notify_common.yml'

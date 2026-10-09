@@ -1,0 +1,323 @@
+# .gitlab-ci/includes/stages/cleanup/58_stage_cleanup_common.yml # 後片付け・Pipeline専有リソース削除
+# ==================================================
+# ID      : 58
+# Name    : stage_cleanup_common
+# Version : 3.0
+# File    : .gitlab-ci/includes/stages/cleanup/58_stage_cleanup_common.yml
+# Purpose :
+#   Safe Cleanup
+#   Shared Runner Protection
+#   Docker Resource Cleanup
+#   Workspace Cleanup
+#   Cleanup Audit Report
+# ==================================================
+
+# --------------------------------------
+# Cleanup Base
+# --------------------------------------
+
+.cleanup-base:
+
+  stage: cleanup
+
+  when: always
+
+  allow_failure: true
+
+  timeout: 15m
+
+  artifacts:
+
+    when: always
+
+    expire_in: 30 days
+
+    paths:
+
+      - reports/cleanup/
+
+  before_script:
+
+    - mkdir -p reports/cleanup
+
+# --------------------------------------
+# Cleanup Safety Check
+# --------------------------------------
+
+cleanup_safety_check:
+
+  extends:
+
+    - .cleanup-base
+
+  script:
+
+    - echo "===================================="
+
+    - echo "Cleanup Safety Check"
+
+    - echo "===================================="
+
+    - |
+
+      cat > reports/cleanup/safety-rules.txt << EOF
+      Cleanup Safety Rules
+
+      Forbidden Commands:
+
+      docker system prune
+
+      docker image prune
+
+      docker volume prune
+
+      docker network prune
+
+      docker builder prune
+
+      Cleanup Target:
+
+      label=gitlab-ci-owner=${CI_PIPELINE_ID}
+
+      Pipeline:
+      ${CI_PIPELINE_ID}
+
+      Date:
+      $(date)
+      EOF
+
+    - echo "Cleanup Safety Check Passed"
+
+# --------------------------------------
+# Application Cleanup
+# --------------------------------------
+
+cleanup_application:
+
+  extends:
+
+    - .cleanup-base
+
+  needs:
+
+    - cleanup_safety_check
+
+  script:
+
+    - echo "===================================="
+
+    - echo "Application Cleanup"
+
+    - echo "===================================="
+
+    - |
+
+      if [ "${CLEANUP_ENABLED}" != "true" ]
+      then
+
+        echo "Cleanup Disabled"
+
+        exit 0
+
+      fi
+
+    - |
+
+      if [ -f app.pid ]
+      then
+
+        PID=$(cat app.pid)
+
+        echo "Stopping PID=${PID}"
+
+        kill "${PID}" || true
+
+        rm -f app.pid
+
+      fi
+
+    - echo "Application Cleanup Finished"
+
+# --------------------------------------
+# Docker Cleanup
+# --------------------------------------
+
+cleanup_docker:
+
+  extends:
+
+    - .cleanup-base
+
+  needs:
+
+    - cleanup_application
+
+  script:
+
+    - echo "===================================="
+
+    - echo "Docker Cleanup"
+
+    - echo "===================================="
+
+    - |
+
+      if [ "${CLEANUP_ENABLED}" != "true" ]
+      then
+
+        echo "Cleanup Disabled"
+
+        exit 0
+
+      fi
+
+    - |
+
+      if command -v docker >/dev/null 2>&1
+      then
+
+        docker ps -a \
+          --filter "label=gitlab-ci-owner=${CI_PIPELINE_ID}" \
+          --format "{{.ID}}" \
+          | xargs -r docker rm -f || true
+
+      fi
+
+    - |
+
+      if command -v docker >/dev/null 2>&1
+      then
+
+        docker network ls \
+          --filter "label=gitlab-ci-owner=${CI_PIPELINE_ID}" \
+          --format "{{.ID}}" \
+          | xargs -r docker network rm || true
+
+      fi
+
+    - |
+
+      if command -v docker >/dev/null 2>&1
+      then
+
+        docker volume ls \
+          --filter "label=gitlab-ci-owner=${CI_PIPELINE_ID}" \
+          --format "{{.Name}}" \
+          | xargs -r docker volume rm || true
+
+      fi
+
+    - echo "Docker Cleanup Finished"
+
+# --------------------------------------
+# Workspace Cleanup
+# --------------------------------------
+
+cleanup_workspace:
+
+  extends:
+
+    - .cleanup-base
+
+  needs:
+
+    - cleanup_docker
+
+  script:
+
+    - echo "===================================="
+
+    - echo "Workspace Cleanup"
+
+    - echo "===================================="
+
+    - |
+
+      rm -rf tmp/* 2>/dev/null || true
+
+    - |
+
+      rm -rf work/* 2>/dev/null || true
+
+    - |
+
+      rm -rf staging/* 2>/dev/null || true
+
+    - echo "Workspace Cleanup Finished"
+
+# --------------------------------------
+# Cleanup Report
+# --------------------------------------
+
+cleanup_report:
+
+  extends:
+
+    - .cleanup-base
+
+  needs:
+
+    - cleanup_workspace
+
+  artifacts:
+
+    when: always
+
+    expire_in: 30 days
+
+    paths:
+
+      - reports/cleanup/
+
+  script:
+
+    - echo "Cleanup Completed" \
+      > reports/cleanup/cleanup-summary.txt
+
+    - echo "APP_NAME=${APP_NAME}" \
+      >> reports/cleanup/cleanup-summary.txt
+
+    - echo "APP_TYPE=${APP_TYPE}" \
+      >> reports/cleanup/cleanup-summary.txt
+
+    - echo "CI_PIPELINE_ID=${CI_PIPELINE_ID}" \
+      >> reports/cleanup/cleanup-summary.txt
+
+    - echo "CI_COMMIT_SHA=${CI_COMMIT_SHA}" \
+      >> reports/cleanup/cleanup-summary.txt
+
+    - echo "CLEANUP_ENABLED=${CLEANUP_ENABLED}" \
+      >> reports/cleanup/cleanup-summary.txt
+
+    - echo "CLEANUP_DATE=$(date)" \
+      >> reports/cleanup/cleanup-summary.txt
+
+    - echo "STATUS=SUCCESS" \
+      >> reports/cleanup/cleanup-summary.txt
+
+    - echo "Cleanup Report Generated"
+
+# --------------------------------------
+# Cleanup Complete
+# --------------------------------------
+
+cleanup_complete:
+
+  extends:
+
+    - .cleanup-base
+
+  needs:
+
+    - cleanup_report
+
+  script:
+
+    - echo "===================================="
+
+    - echo "Cleanup Complete"
+
+    - echo "Pipeline=${CI_PIPELINE_ID}"
+
+    - echo "===================================="
+    

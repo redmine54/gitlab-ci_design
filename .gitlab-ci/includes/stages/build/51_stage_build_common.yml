@@ -1,0 +1,206 @@
+# .gitlab-ci/includes/stages/build/51_stage_build_common.yml # 共通Build・Package処理
+# ==================================================
+# ID      : 51
+# Name    : stage_build_common
+# Version : 2.0
+# File    : .gitlab-ci/includes/stages/build/51_stage_build_common.yml
+# Purpose :
+#   Common Build Stage
+#   Common Package Stage
+# ==================================================
+
+# --------------------------------------
+# Build Base
+# --------------------------------------
+
+.build-base:
+
+  stage: build
+
+  artifacts:
+
+    when: always
+
+    expire_in: 30 days
+
+    paths:
+
+      - build-output/
+
+      - target/
+
+      - dist/
+
+  script:
+
+    - echo "===================================="
+    - echo "Build Started"
+    - echo "APP_NAME=${APP_NAME}"
+    - echo "APP_TYPE=${APP_TYPE}"
+    - echo "===================================="
+
+    - chmod +x .gitlab-ci/scripts/build/**/* 2>/dev/null || true
+
+    - |
+
+      case "${APP_TYPE}" in
+
+        tomcat)
+
+          ./.gitlab-ci/scripts/build/java/71_lang_tomcat_build.sh
+
+          ;;
+
+        springboot)
+
+          ./.gitlab-ci/scripts/build/java/72_lang_springboot_build.sh
+
+          ;;
+
+        nodejs)
+
+          ./.gitlab-ci/scripts/build/nodejs/73_lang_nodejs_build.sh
+
+          ;;
+
+        python)
+
+          ./.gitlab-ci/scripts/build/python/74_lang_python_build.sh
+
+          ;;
+
+        was)
+
+          ./.gitlab-ci/scripts/build/was/75_lang_was_build.sh
+
+          ;;
+
+        liberty)
+
+          ./.gitlab-ci/scripts/build/was/76_lang_liberty_build.sh
+
+          ;;
+
+        *)
+
+          echo "Unsupported APP_TYPE=${APP_TYPE}"
+
+          exit 1
+
+          ;;
+
+      esac
+
+    - echo "Build Finished"
+
+# --------------------------------------
+# Build
+# --------------------------------------
+
+build:
+
+  extends:
+
+    - .build-base
+
+  rules:
+
+    - if: '$CI_COMMIT_TAG'
+
+    - if: '$CI_COMMIT_BRANCH == "master"'
+
+    - if: '$CI_COMMIT_BRANCH =~ /^feature\/.*/'
+
+# --------------------------------------
+# Package Verification
+# --------------------------------------
+
+package:
+
+  stage: package
+
+  needs:
+
+    - build
+
+  artifacts:
+
+    when: always
+
+    expire_in: 30 days
+
+    paths:
+
+      - build-output/
+
+      - target/
+
+      - dist/
+
+  script:
+
+    - echo "===================================="
+
+    - echo "Package Verification"
+
+    - echo "APP_TYPE=${APP_TYPE}"
+
+    - echo "===================================="
+
+    - |
+
+      case "${APP_TYPE}" in
+
+        tomcat)
+
+          find . -name "*.war"
+
+          ;;
+
+        springboot)
+
+          find . -name "*.jar"
+
+          ;;
+
+        nodejs)
+
+          find . -type d -name "dist"
+
+          ;;
+
+        python)
+
+          find . -type d -name "dist"
+
+          ;;
+
+        was)
+
+          find . -name "*.ear"
+
+          ;;
+
+        liberty)
+
+          find . -name "*.war"
+
+          ;;
+
+        *)
+
+          echo "Unsupported APP_TYPE=${APP_TYPE}"
+
+          exit 1
+
+          ;;
+
+      esac
+
+    - echo "Package Verification Finished"
+
+  rules:
+
+    - if: '$CI_COMMIT_TAG'
+
+    - if: '$CI_COMMIT_BRANCH == "master"'

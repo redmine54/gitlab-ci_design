@@ -1,0 +1,243 @@
+# .gitlab-ci/includes/stages/e2e/53_stage_e2e_common.yml # アプリ起動・HealthCheck・Playwright E2E
+# ==================================================
+# ID      : 53
+# Name    : stage_e2e_common
+# Version : 2.0
+# File    : .gitlab-ci/includes/stages/e2e/53_stage_e2e_common.yml
+# Purpose :
+#   Application Startup
+#   Health Check
+#   Playwright E2E Test
+# ==================================================
+
+# --------------------------------------
+# Staging
+# --------------------------------------
+
+staging:
+
+  stage: staging
+
+  needs:
+
+    - package
+
+  artifacts:
+
+    when: always
+
+    expire_in: 30 days
+
+    paths:
+
+      - app.pid
+
+      - startup.log
+
+  script:
+
+    - echo "===================================="
+
+    - echo "Application Startup"
+
+    - echo "APP_NAME=${APP_NAME}"
+
+    - echo "APP_TYPE=${APP_TYPE}"
+
+    - echo "===================================="
+
+    - chmod +x .gitlab-ci/scripts/startup/**/* 2>/dev/null || true
+
+    - |
+
+      case "${APP_TYPE}" in
+
+        tomcat)
+
+          ./.gitlab-ci/scripts/startup/java/91_start_tomcat.sh
+
+          ;;
+
+        springboot)
+
+          ./.gitlab-ci/scripts/startup/java/92_start_springboot.sh
+
+          ;;
+
+        nodejs)
+
+          ./.gitlab-ci/scripts/startup/nodejs/93_start_nodejs.sh
+
+          ;;
+
+        python)
+
+          ./.gitlab-ci/scripts/startup/python/94_start_python.sh
+
+          ;;
+
+        was)
+
+          ./.gitlab-ci/scripts/startup/was/95_start_was.sh
+
+          ;;
+
+        liberty)
+
+          ./.gitlab-ci/scripts/startup/was/96_start_liberty.sh
+
+          ;;
+
+        *)
+
+          echo "Unsupported APP_TYPE=${APP_TYPE}"
+
+          exit 1
+
+          ;;
+
+      esac
+
+    - echo "Startup Finished"
+
+  rules:
+
+    - if: '$CI_COMMIT_TAG'
+
+    - if: '$CI_COMMIT_BRANCH == "master"'
+
+    - if: '$CI_COMMIT_BRANCH =~ /^feature\/.*/'
+
+# --------------------------------------
+# Health Check
+# --------------------------------------
+
+health_check:
+
+  stage: e2e
+
+  needs:
+
+    - staging
+
+  script:
+
+    - echo "===================================="
+
+    - echo "Health Check"
+
+    - echo "URL=${HEALTHCHECK_URL}"
+
+    - echo "===================================="
+
+    - |
+
+      if [ -z "${HEALTHCHECK_URL}" ]
+      then
+
+        echo "HEALTHCHECK_URL is required"
+
+        exit 1
+
+      fi
+
+    - |
+
+      for i in $(seq 1 60)
+      do
+
+        if curl -fs "${HEALTHCHECK_URL}" >/dev/null 2>&1
+        then
+
+          echo "Health Check Passed"
+
+          exit 0
+
+        fi
+
+        echo "Waiting application startup..."
+
+        sleep 5
+
+      done
+
+      echo "Health Check Timeout"
+
+      exit 1
+
+  rules:
+
+    - if: '$CI_COMMIT_TAG'
+
+    - if: '$CI_COMMIT_BRANCH == "master"'
+
+    - if: '$CI_COMMIT_BRANCH =~ /^feature\/.*/'
+
+# --------------------------------------
+# Playwright E2E
+# --------------------------------------
+
+e2e:
+
+  stage: e2e
+
+  needs:
+
+    - health_check
+
+  artifacts:
+
+    when: always
+
+    expire_in: 30 days
+
+    paths:
+
+      - playwright-report/
+
+      - test-results/
+
+      - artifacts/e2e/screenshots/
+
+      - artifacts/e2e/videos/
+
+      - artifacts/e2e/traces/
+
+      - startup.log
+
+  script:
+
+    - echo "===================================="
+
+    - echo "Playwright E2E Started"
+
+    - echo "===================================="
+
+    - chmod +x .gitlab-ci/scripts/e2e/* 2>/dev/null || true
+
+    - ./.gitlab-ci/scripts/e2e/97_run_playwright.sh
+
+    - echo "Playwright E2E Finished"
+
+  after_script:
+
+    - |
+
+      if [ -f app.pid ]
+      then
+
+        PID=$(cat app.pid)
+
+        echo "Stopping PID=${PID}"
+
+        kill "${PID}" || true
+
+      fi
+
+  rules:
+
+    - if: '$CI_COMMIT_TAG'
+
+    - if: '$CI_COMMIT_BRANCH == "master"'
+
+    - if: '$CI_COMMIT_BRANCH =~ /^feature\/.*/'

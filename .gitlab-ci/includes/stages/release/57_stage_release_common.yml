@@ -1,0 +1,279 @@
+# .gitlab-ci/includes/stages/release/57_stage_release_common.yml # リリース情報生成・リリース公開
+# ==================================================
+# ID      : 57
+# Name    : stage_release_common
+# Version : 3.0
+# File    : .gitlab-ci/includes/stages/release/57_stage_release_common.yml
+# Purpose :
+#   Release Validation
+#   Release Note Generation
+#   Release Publish
+#   Release Report
+# ==================================================
+
+# --------------------------------------
+# Release Validation
+# --------------------------------------
+
+release_validation:
+
+  stage: release
+
+  needs:
+
+    - deploy_report
+
+  script:
+
+    - echo "===================================="
+
+    - echo "Release Validation"
+
+    - echo "===================================="
+
+    - |
+
+      if [ -z "${CI_COMMIT_TAG}" ]
+      then
+
+        echo "CI_COMMIT_TAG is required"
+
+        exit 1
+
+      fi
+
+    - |
+
+      if [ -z "${RELEASE_VERSION}" ]
+      then
+
+        echo "RELEASE_VERSION is required"
+
+        exit 1
+
+      fi
+
+    - |
+
+      if [ ! -f reports/deploy/deploy-summary.txt ]
+      then
+
+        echo "deploy-summary.txt not found"
+
+        exit 1
+
+      fi
+
+    - echo "Release Validation Passed"
+
+  rules:
+
+    - if: '$CI_COMMIT_TAG'
+
+# --------------------------------------
+# Release Note Generate
+# --------------------------------------
+
+release_note_generate:
+
+  stage: release
+
+  needs:
+
+    - release_validation
+
+  artifacts:
+
+    when: always
+
+    expire_in: 365 days
+
+    paths:
+
+      - reports/release/
+
+  script:
+
+    - mkdir -p reports/release
+
+    - echo "# Release Notes" \
+      > reports/release/release-notes.md
+
+    - echo "" \
+      >> reports/release/release-notes.md
+
+    - echo "## Application" \
+      >> reports/release/release-notes.md
+
+    - echo "${APP_NAME}" \
+      >> reports/release/release-notes.md
+
+    - echo "" \
+      >> reports/release/release-notes.md
+
+    - echo "## Version" \
+      >> reports/release/release-notes.md
+
+    - echo "${RELEASE_VERSION}" \
+      >> reports/release/release-notes.md
+
+    - echo "" \
+      >> reports/release/release-notes.md
+
+    - echo "## Tag" \
+      >> reports/release/release-notes.md
+
+    - echo "${CI_COMMIT_TAG}" \
+      >> reports/release/release-notes.md
+
+    - echo "" \
+      >> reports/release/release-notes.md
+
+    - echo "## Commit" \
+      >> reports/release/release-notes.md
+
+    - echo "${CI_COMMIT_SHA}" \
+      >> reports/release/release-notes.md
+
+    - echo "" \
+      >> reports/release/release-notes.md
+
+    - echo "## Pipeline" \
+      >> reports/release/release-notes.md
+
+    - echo "${CI_PIPELINE_ID}" \
+      >> reports/release/release-notes.md
+
+    - echo "" \
+      >> reports/release/release-notes.md
+
+    - echo "## Deploy Environment" \
+      >> reports/release/release-notes.md
+
+    - echo "${DEPLOY_ENV}" \
+      >> reports/release/release-notes.md
+
+    - echo "" \
+      >> reports/release/release-notes.md
+
+    - echo "## Deploy URL" \
+      >> reports/release/release-notes.md
+
+    - echo "${DEPLOY_URL}" \
+      >> reports/release/release-notes.md
+
+    - echo "" \
+      >> reports/release/release-notes.md
+
+    - echo "## Release Date" \
+      >> reports/release/release-notes.md
+
+    - date \
+      >> reports/release/release-notes.md
+
+  rules:
+
+    - if: '$CI_COMMIT_TAG'
+
+# --------------------------------------
+# Release Publish
+# --------------------------------------
+
+release_publish:
+
+  stage: release
+
+  needs:
+
+    - release_note_generate
+
+  script:
+
+    - echo "===================================="
+
+    - echo "Release Publish"
+
+    - echo "===================================="
+
+    - |
+
+      if [ -x ".gitlab-ci/scripts/release/111_release_publish.sh" ]
+      then
+
+        ./.gitlab-ci/scripts/release/111_release_publish.sh
+
+      else
+
+        echo "111_release_publish.sh not configured"
+
+      fi
+
+    - echo "Release Publish Completed"
+
+  rules:
+
+    - if: '$CI_COMMIT_TAG'
+
+# --------------------------------------
+# Release Report
+# --------------------------------------
+
+release_report:
+
+  stage: release
+
+  needs:
+
+    - release_publish
+
+  artifacts:
+
+    when: always
+
+    expire_in: 365 days
+
+    paths:
+
+      - reports/release/
+
+  script:
+
+    - mkdir -p reports/release
+
+    - echo "Release Completed" \
+      > reports/release/release-summary.txt
+
+    - echo "APP_NAME=${APP_NAME}" \
+      >> reports/release/release-summary.txt
+
+    - echo "APP_TYPE=${APP_TYPE}" \
+      >> reports/release/release-summary.txt
+
+    - echo "RELEASE_VERSION=${RELEASE_VERSION}" \
+      >> reports/release/release-summary.txt
+
+    - echo "CI_COMMIT_TAG=${CI_COMMIT_TAG}" \
+      >> reports/release/release-summary.txt
+
+    - echo "CI_COMMIT_SHA=${CI_COMMIT_SHA}" \
+      >> reports/release/release-summary.txt
+
+    - echo "CI_PIPELINE_ID=${CI_PIPELINE_ID}" \
+      >> reports/release/release-summary.txt
+
+    - echo "DEPLOY_ENV=${DEPLOY_ENV}" \
+      >> reports/release/release-summary.txt
+
+    - echo "DEPLOY_URL=${DEPLOY_URL}" \
+      >> reports/release/release-summary.txt
+
+    - echo "RELEASE_DATE=$(date)" \
+      >> reports/release/release-summary.txt
+
+    - echo "STATUS=SUCCESS" \
+      >> reports/release/release-summary.txt
+
+  rules:
+
+    - if: '$CI_COMMIT_TAG'
+    

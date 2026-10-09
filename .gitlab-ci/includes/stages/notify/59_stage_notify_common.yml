@@ -1,0 +1,297 @@
+# .gitlab-ci/includes/stages/notify/59_stage_notify_common.yml # 成功/失敗通知・Teams/メール通知
+# ==================================================
+# ID      : 59
+# Name    : stage_notify_common
+# Version : 3.1
+# File    : .gitlab-ci/includes/stages/notify/59_stage_notify_common.yml
+# Purpose :
+#   Success Notification
+#   Failure Notification
+#   Release Notification
+#   Teams Notification
+#   Mail Notification
+#   Notification Report
+# ==================================================
+
+# --------------------------------------
+# Notify Base
+# --------------------------------------
+
+.notify-base:
+  stage: notify
+
+  when: always
+
+  allow_failure: true
+
+  artifacts:
+    when: always
+
+    expire_in: 30 days
+
+    paths:
+      - reports/notify/
+
+  before_script:
+    - mkdir -p reports/notify
+
+# --------------------------------------
+# Notify Context
+# --------------------------------------
+
+notify_context_generate:
+  extends:
+    - .notify-base
+
+  script:
+    - echo "APP_NAME=${APP_NAME}" \
+      > reports/notify/notify-context.txt
+
+    - echo "APP_TYPE=${APP_TYPE}" \
+      >> reports/notify/notify-context.txt
+
+    - echo "DEPLOY_ENV=${DEPLOY_ENV}" \
+      >> reports/notify/notify-context.txt
+
+    - echo "RELEASE_VERSION=${RELEASE_VERSION}" \
+      >> reports/notify/notify-context.txt
+
+    - echo "CI_PIPELINE_ID=${CI_PIPELINE_ID}" \
+      >> reports/notify/notify-context.txt
+
+    - echo "CI_COMMIT_SHA=${CI_COMMIT_SHA}" \
+      >> reports/notify/notify-context.txt
+
+    - echo "CI_COMMIT_TAG=${CI_COMMIT_TAG}" \
+      >> reports/notify/notify-context.txt
+
+    - echo "DATE=$(date)" \
+      >> reports/notify/notify-context.txt
+
+# --------------------------------------
+# Success Notification
+# --------------------------------------
+
+notify_success:
+  extends:
+    - .notify-base
+
+  needs:
+    - notify_context_generate
+
+  script:
+    - echo "PIPELINE_RESULT=SUCCESS" \
+      > reports/notify/pipeline-status.txt
+
+    - |
+
+      if [ -x ".gitlab-ci/scripts/notify/121_notify_success.sh" ]
+      then
+
+        ./.gitlab-ci/scripts/notify/121_notify_success.sh
+
+      else
+
+        echo "121_notify_success.sh not configured"
+
+      fi
+
+  rules:
+    - if: "$CI_PIPELINE_SOURCE"
+      when: on_success
+
+# --------------------------------------
+# Failure Notification
+# --------------------------------------
+
+notify_failure:
+  extends:
+    - .notify-base
+
+  needs:
+    - notify_context_generate
+
+  script:
+    - echo "PIPELINE_RESULT=FAILURE" \
+      > reports/notify/pipeline-status.txt
+
+    - |
+
+      if [ -x ".gitlab-ci/scripts/notify/122_notify_failure.sh" ]
+      then
+
+        ./.gitlab-ci/scripts/notify/122_notify_failure.sh
+
+      else
+
+        echo "122_notify_failure.sh not configured"
+
+      fi
+
+  rules:
+    - if: "$CI_PIPELINE_SOURCE"
+      when: on_failure
+
+# --------------------------------------
+# Release Notification
+# --------------------------------------
+
+notify_release:
+  extends:
+    - .notify-base
+
+  needs:
+    - notify_context_generate
+
+  script:
+    - |
+
+      if [ -n "${CI_COMMIT_TAG}" ]
+      then
+
+        if [ -x ".gitlab-ci/scripts/notify/125_notify_release.sh" ]
+        then
+
+          ./.gitlab-ci/scripts/notify/125_notify_release.sh
+
+        else
+
+          echo "125_notify_release.sh not configured"
+
+        fi
+
+      fi
+
+# --------------------------------------
+# Teams Notification
+# --------------------------------------
+
+notify_teams:
+  extends:
+    - .notify-base
+
+  needs:
+    - notify_context_generate
+
+  script:
+    - |
+
+      if [ -n "${NOTIFY_TEAMS_WEBHOOK}" ]
+      then
+
+        if [ -x ".gitlab-ci/scripts/notify/124_notify_teams.sh" ]
+        then
+
+          ./.gitlab-ci/scripts/notify/124_notify_teams.sh
+
+        else
+
+          echo "124_notify_teams.sh not configured"
+
+        fi
+
+      else
+
+        echo "Teams Notification Disabled"
+
+      fi
+
+# --------------------------------------
+# Mail Notification
+# --------------------------------------
+
+notify_mail:
+  extends:
+    - .notify-base
+
+  needs:
+    - notify_context_generate
+
+  script:
+    - |
+
+      if [ -n "${NOTIFY_MAIL_TO}" ]
+      then
+
+        if [ -x ".gitlab-ci/scripts/notify/123_notify_mail.sh" ]
+        then
+
+          ./.gitlab-ci/scripts/notify/123_notify_mail.sh
+
+        else
+
+          echo "123_notify_mail.sh not configured"
+
+        fi
+
+      else
+
+        echo "Mail Notification Disabled"
+
+      fi
+
+# --------------------------------------
+# Notification Report
+# --------------------------------------
+
+notify_report:
+  extends:
+    - .notify-base
+
+  when: always
+
+  artifacts:
+    when: always
+
+    expire_in: 30 days
+
+    paths:
+      - reports/notify/
+
+  script:
+    - mkdir -p reports/notify
+
+    - echo "Notification Completed" \
+      > reports/notify/notify-summary.txt
+
+    - echo "APP_NAME=${APP_NAME}" \
+      >> reports/notify/notify-summary.txt
+
+    - echo "APP_TYPE=${APP_TYPE}" \
+      >> reports/notify/notify-summary.txt
+
+    - echo "DEPLOY_ENV=${DEPLOY_ENV}" \
+      >> reports/notify/notify-summary.txt
+
+    - echo "RELEASE_VERSION=${RELEASE_VERSION}" \
+      >> reports/notify/notify-summary.txt
+
+    - echo "CI_PIPELINE_ID=${CI_PIPELINE_ID}" \
+      >> reports/notify/notify-summary.txt
+
+    - echo "CI_COMMIT_SHA=${CI_COMMIT_SHA}" \
+      >> reports/notify/notify-summary.txt
+
+    - echo "CI_COMMIT_TAG=${CI_COMMIT_TAG}" \
+      >> reports/notify/notify-summary.txt
+
+    - |
+
+      if [ -f reports/notify/pipeline-status.txt ]
+      then
+
+        cat reports/notify/pipeline-status.txt \
+          >> reports/notify/notify-summary.txt
+      fi
+
+    - echo "MAIL_ENABLED=${NOTIFY_MAIL_TO}" \
+      >> reports/notify/notify-summary.txt
+
+    - echo "TEAMS_ENABLED=${NOTIFY_TEAMS_WEBHOOK}" \
+      >> reports/notify/notify-summary.txt
+
+    - echo "NOTIFY_DATE=$(date)" \
+      >> reports/notify/notify-summary.txt
+
+    - echo "STATUS=COMPLETED" \
+      >> reports/notify/notify-summary.txt

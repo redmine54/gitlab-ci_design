@@ -1,0 +1,486 @@
+# .gitlab-ci/includes/stages/deploy/56_stage_deploy_common.yml # 配置処理・配置後疎通確認
+# ==================================================
+# ID      : 56
+# Name    : stage_deploy_common
+# Version : 3.0
+# File    : .gitlab-ci/includes/stages/deploy/56_stage_deploy_common.yml
+# Purpose :
+#   Safe Deployment
+#   Environment Validation
+#   PROD Approval Required
+#   Shared Deploy Logic
+#   Deployment Verification
+#   Rollback Support
+# ==================================================
+
+# --------------------------------------
+# Deploy Base
+# --------------------------------------
+
+.deploy-base:
+
+  stage: deploy
+
+  timeout: 30m
+
+  artifacts:
+
+    when: always
+
+    expire_in: 30 days
+
+    paths:
+
+      - reports/deploy/
+
+  before_script:
+
+    - mkdir -p reports/deploy
+
+    - echo "===================================="
+
+    - echo "Deploy Started"
+
+    - echo "APP_NAME=${APP_NAME}"
+
+    - echo "APP_TYPE=${APP_TYPE}"
+
+    - echo "DEPLOY_ENV=${DEPLOY_ENV}"
+
+    - echo "DEPLOY_TARGET=${DEPLOY_TARGET}"
+
+    - echo "PIPELINE=${CI_PIPELINE_ID}"
+
+    - echo "===================================="
+
+# --------------------------------------
+# Deploy Safety Check
+# --------------------------------------
+
+deploy_safety_check:
+
+  stage: deploy
+
+  script:
+
+    - echo "===================================="
+
+    - echo "Deploy Safety Check"
+
+    - echo "===================================="
+
+    - |
+
+      case "${DEPLOY_ENV}" in
+
+        dev|stg|prod)
+
+          echo "DEPLOY_ENV OK"
+
+          ;;
+
+        *)
+
+          echo "Invalid DEPLOY_ENV=${DEPLOY_ENV}"
+
+          exit 1
+
+          ;;
+
+      esac
+
+    - |
+
+      case "${DEPLOY_TARGET}" in
+
+        dev|stg|prod)
+
+          echo "DEPLOY_TARGET OK"
+
+          ;;
+
+        *)
+
+          echo "Invalid DEPLOY_TARGET=${DEPLOY_TARGET}"
+
+          exit 1
+
+          ;;
+
+      esac
+
+    - |
+
+      if [ -z "${DEPLOY_HEALTHCHECK_URL}" ]
+      then
+
+        echo "DEPLOY_HEALTHCHECK_URL required"
+
+        exit 1
+
+      fi
+
+    - |
+
+      if [ "${DEPLOY_ENV}" = "prod" ]
+      then
+
+        if [ -z "${CI_COMMIT_TAG}" ]
+        then
+
+          echo "Production requires CI_COMMIT_TAG"
+
+          exit 1
+
+        fi
+
+      fi
+
+    - echo "Deploy Safety Check Passed"
+
+  rules:
+
+    - if: '$CI_COMMIT_BRANCH == "master"'
+
+    - if: '$CI_COMMIT_TAG'
+
+# --------------------------------------
+# Production Approval
+# --------------------------------------
+
+deploy_prod_approval:
+
+  stage: deploy
+
+  needs:
+
+    - security_gate
+
+    - performance_gate
+
+    - deploy_safety_check
+
+  when: manual
+
+  allow_failure: false
+
+  script:
+
+    - echo "Production Deployment Approved"
+
+  rules:
+
+    - if: '$DEPLOY_ENV == "prod"'
+      when: manual
+
+    - when: never
+
+# --------------------------------------
+# Shared Deploy Execute
+# --------------------------------------
+
+.deploy-execute:
+
+  extends:
+
+    - .deploy-base
+
+  script:
+
+    - chmod +x .gitlab-ci/scripts/deploy/**/* 2>/dev/null || true
+
+    - |
+
+      case "${APP_TYPE}" in
+
+        tomcat)
+
+          DEPLOY_SCRIPT=.gitlab-ci/scripts/deploy/java/101_deploy_tomcat.sh
+
+          ;;
+
+        springboot)
+
+          DEPLOY_SCRIPT=.gitlab-ci/scripts/deploy/java/102_deploy_springboot.sh
+
+          ;;
+
+        nodejs)
+
+          DEPLOY_SCRIPT=.gitlab-ci/scripts/deploy/nodejs/103_deploy_nodejs.sh
+
+          ;;
+
+        python)
+
+          DEPLOY_SCRIPT=.gitlab-ci/scripts/deploy/python/104_deploy_python.sh
+
+          ;;
+
+        was)
+
+          DEPLOY_SCRIPT=.gitlab-ci/scripts/deploy/was/105_deploy_was.sh
+
+          ;;
+
+        liberty)
+
+          DEPLOY_SCRIPT=.gitlab-ci/scripts/deploy/was/106_deploy_liberty.sh
+
+          ;;
+
+        *)
+
+          echo "Unsupported APP_TYPE=${APP_TYPE}"
+
+          exit 1
+
+          ;;
+
+      esac
+
+    - |
+
+      if [ ! -x "${DEPLOY_SCRIPT}" ]
+      then
+
+        echo "Deploy Script Not Found"
+
+        exit 1
+
+      fi
+
+    - echo "Execute ${DEPLOY_SCRIPT}"
+
+    - "${DEPLOY_SCRIPT}"
+
+    - echo "Deploy Finished"
+
+# --------------------------------------
+# Deploy
+# --------------------------------------
+
+deploy:
+
+  extends:
+
+    - .deploy-execute
+
+  needs:
+
+    - security_gate
+
+    - performance_gate
+
+    - deploy_safety_check
+
+  rules:
+
+    - if: '$DEPLOY_ENV == "dev"'
+
+    - if: '$DEPLOY_ENV == "stg"'
+
+    - if: '$DEPLOY_ENV == "prod"'
+
+      when: never
+
+# --------------------------------------
+# Production Deploy
+# --------------------------------------
+
+deploy_prod:
+
+  extends:
+
+    - .deploy-execute
+
+  needs:
+
+    - deploy_prod_approval
+
+  environment:
+
+    name: production
+
+    deployment_tier: production
+
+  rules:
+
+    - if: '$DEPLOY_ENV == "prod"'
+
+# --------------------------------------
+# Deployment Verification
+# --------------------------------------
+
+deploy_verify:
+
+  stage: deploy
+
+  script:
+
+    - echo "===================================="
+
+    - echo "Deployment Verification"
+
+    - echo "APP_NAME=${APP_NAME}"
+
+    - echo "DEPLOY_ENV=${DEPLOY_ENV}"
+
+    - echo "URL=${DEPLOY_HEALTHCHECK_URL}"
+
+    - echo "===================================="
+
+    - |
+
+      if [ -z "${DEPLOY_HEALTHCHECK_URL}" ]
+      then
+
+        echo "DEPLOY_HEALTHCHECK_URL required"
+
+        exit 1
+
+      fi
+
+    - |
+
+      SUCCESS=0
+
+      for i in $(seq 1 30)
+      do
+
+        if curl -fs "${DEPLOY_HEALTHCHECK_URL}" >/dev/null 2>&1
+        then
+
+          SUCCESS=1
+
+          break
+
+        fi
+
+        echo "Waiting deployment..."
+
+        sleep 10
+
+      done
+
+      if [ "${SUCCESS}" != "1" ]
+      then
+
+        echo "Deployment Verification Failed"
+
+        exit 1
+
+      fi
+
+    - echo "Deployment Verification Passed"
+
+  rules:
+
+    - if: '$DEPLOY_ENV == "dev"'
+
+    - if: '$DEPLOY_ENV == "stg"'
+
+    - if: '$DEPLOY_ENV == "prod"'
+
+# --------------------------------------
+# Rollback
+# --------------------------------------
+
+rollback:
+
+  stage: deploy
+
+  when: manual
+
+  allow_failure: true
+
+  script:
+
+    - echo "===================================="
+
+    - echo "Rollback Started"
+
+    - echo "===================================="
+
+    - |
+
+      if [ -x ".gitlab-ci/scripts/deploy/rollback.sh" ]
+      then
+
+        ./.gitlab-ci/scripts/deploy/rollback.sh
+
+      else
+
+        echo "rollback.sh not configured"
+
+      fi
+
+  rules:
+
+    - if: '$DEPLOY_ENV == "prod"'
+
+# --------------------------------------
+# Deployment Report
+# --------------------------------------
+
+deploy_report:
+
+  stage: deploy
+
+  needs:
+
+    - deploy_verify
+
+  artifacts:
+
+    when: always
+
+    expire_in: 30 days
+
+    paths:
+
+      - reports/deploy/
+
+  script:
+
+    - mkdir -p reports/deploy
+
+    - echo "Deployment Completed" \
+      > reports/deploy/deploy-summary.txt
+
+    - echo "APP_NAME=${APP_NAME}" \
+      >> reports/deploy/deploy-summary.txt
+
+    - echo "APP_TYPE=${APP_TYPE}" \
+      >> reports/deploy/deploy-summary.txt
+
+    - echo "DEPLOY_ENV=${DEPLOY_ENV}" \
+      >> reports/deploy/deploy-summary.txt
+
+    - echo "DEPLOY_TARGET=${DEPLOY_TARGET}" \
+      >> reports/deploy/deploy-summary.txt
+
+    - echo "DEPLOY_URL=${DEPLOY_URL}" \
+      >> reports/deploy/deploy-summary.txt
+
+    - echo "CI_PIPELINE_ID=${CI_PIPELINE_ID}" \
+      >> reports/deploy/deploy-summary.txt
+
+    - echo "CI_COMMIT_SHA=${CI_COMMIT_SHA}" \
+      >> reports/deploy/deploy-summary.txt
+
+    - echo "CI_COMMIT_TAG=${CI_COMMIT_TAG}" \
+      >> reports/deploy/deploy-summary.txt
+
+    - echo "DEPLOY_DATE=$(date)" \
+      >> reports/deploy/deploy-summary.txt
+
+  rules:
+
+    - if: '$DEPLOY_ENV == "dev"'
+
+    - if: '$DEPLOY_ENV == "stg"'
+
+    - if: '$DEPLOY_ENV == "prod"'
+
+
