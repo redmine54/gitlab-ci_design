@@ -1,0 +1,49 @@
+# Shared pipeline entry point. Include this file from the application project.
+include:
+  - local: "/common_cicd/51_stage_build_common.yml"
+  - local: "/common_cicd/52_stage_test_common.yml"
+  - local: "/common_cicd/53_stage_e2e_common.yml"
+  - local: "/common_cicd/54_stage_security_common.yml"
+  - local: "/common_cicd/55_stage_performance_common.yml"
+
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_TAG == "release"'
+    - if: "$CI_COMMIT_TAG"
+    - if: '$CI_COMMIT_BRANCH == "master"'
+    - if: '$CI_COMMIT_BRANCH =~ /^feature\/.*/'
+    - when: never
+
+stages:
+  - validate
+  - build
+  - unit_test
+  - package
+  - staging
+  - e2e
+  - performance
+  - security
+
+variables:
+  APP_TYPE: ""
+  FRONTEND_TYPE: ""
+  BACKEND_BUILD_IMAGE: "maven:3.9-eclipse-temurin-21"
+  BACKEND_TEST_IMAGE: "maven:3.9-eclipse-temurin-21"
+  BACKEND_BUILD_CMD: ""
+  BACKEND_TEST_CMD: ""
+  BACKEND_PACKAGE_PATH: ""
+  FRONTEND_BUILD_IMAGE: "node:22-alpine"
+  FRONTEND_TEST_IMAGE: "node:22-alpine"
+  FRONTEND_BUILD_CMD: ""
+  FRONTEND_TEST_CMD: ""
+  FRONTEND_PACKAGE_PATH: ""
+  VALIDATE_CMD: ""
+  START_CMD: ""
+  HEALTHCHECK_URL: ""
+  E2E_IMAGE: ""
+  E2E_INSTALL_CMD: ""
+  E2E_CMD: ""
+  SECURITY_IMAGE: "alpine:3.21"
+  SECURITY_CMD: ""
+  PERFORMANCE_SCENARIO: ""

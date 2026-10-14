@@ -1,0 +1,288 @@
+はい。先ほどの「提供資材一覧」の表は、現在のセキュリティ要求を考えると不足しています。
+
+最近のCI/CD基盤では、Build・Testだけでなく、
+
+Security
+Compliance
+Supply Chain Security
+
+
+が必須になりつつあります。
+
+そのため、表は以下のように拡張するのが良いと思います。
+
+# アプリ側が提供すべき資材一覧（拡張版）
+
+| 分類 | 共通CIの処理 | 共通CIが提供 | アプリ側が提供 |
+|--------|--------|--------|--------|
+| Build | Maven Build | mvn clean package | pom.xml、Javaソース |
+| Test | Maven Test | mvn test | *Test.java |
+| Build | Vue Build | npm run build | package.json、Vueソース |
+| Test | Playwright | npx playwright test | *.spec.ts |
+| Test | k6 | k6 run xxx.js | 負荷試験シナリオ |
+| Security | SAST | sonar-scanner | Java/Vue/TSソースコード |
+| Security | SCA | dependency-check | pom.xml、package.json |
+| Security | SBOM生成 | syft | pom.xml、package.json |
+| Security | CVE検査 | trivy fs | ソースコード、依存ライブラリ |
+| Security | Secret Scan | gitleaks | ソースコード全体 |
+| Security | License Check | license-checker | pom.xml、package.json |
+| Security | Container Scan | trivy image | Dockerfile |
+| Security | IaC Scan | checkov | deployment.yaml、service.yaml |
+| Infrastructure | Docker Build | docker build | Dockerfile |
+| Infrastructure | Docker Push | docker push | イメージ名設定 |
+| Infrastructure | OpenShift Deploy | oc apply | deployment.yaml |
+| Infrastructure | WebSphere Deploy | wsadmin | EAR/WAR |
+| Database | DB作成 | psql/mysql/sqlplus | DDL |
+| Database | DB初期データ投入 | psql/mysql/sqlplus | マスタDML |
+| Database | テストデータ投入 | psql/mysql/sqlplus | テストデータDML |
+| Test | API試験 | curl/Postman/Newman | API試験定義 |
+| Utility | アプリ固有Shell | 実行制御 | scripts/*.sh |
+```
+
+---
+
+# アプリ側が提供する資材分類
+
+実際にはアプリ側資材は次の7カテゴリに整理できます。
+
+## ① ソースコード
+
+```text
+backend/src/main/java
+frontend/src
+```
+
+例
+
+```text
+Controller
+Service
+Repository
+Vue Component
+TypeScript
+```
+
+---
+
+## ② テストコード
+
+```text
+src/test/java
+tests/e2e
+tests/performance
+```
+
+例
+
+```text
+JUnit
+Playwright
+k6
+```
+
+---
+
+## ③ DB資材
+
+```text
+sql/
+```
+
+例
+
+```text
+DDL
+DML
+マスタデータ
+テストデータ
+```
+
+---
+
+## ④ OSS定義
+
+例
+
+```text
+pom.xml
+package.json
+package-lock.json
+```
+
+SBOM
+
+```text
+syft
+```
+
+SCA
+
+```text
+dependency-check
+```
+
+ライセンスチェック
+
+```text
+license-checker
+```
+
+の対象になる。
+
+---
+
+## ⑤ セキュリティ対象資材
+
+例
+
+```text
+Java
+Vue
+TypeScript
+YAML
+Shell
+Dockerfile
+```
+
+以下の入力になる。
+
+```text
+SAST
+Secret Scan
+CVE
+```
+
+---
+
+## ⑥ インフラ定義
+
+例
+
+```text
+Dockerfile
+
+openshift/
+ ├─ deployment.yaml
+ ├─ service.yaml
+ └─ route.yaml
+```
+
+以下の対象となる。
+
+```text
+Container Scan
+IaC Scan
+OpenShift Deploy
+```
+
+---
+
+## ⑦ 実行補助スクリプト
+
+例
+
+```text
+scripts/
+ ├─ create_db.sh
+ ├─ api_test.sh
+ ├─ integration_test.sh
+ └─ batch_test.sh
+```
+
+アプリ固有の処理。
+
+---
+
+# 共通CIとの責務分離
+
+## 共通CI/CDリポジトリ
+
+```text
+HOW
+どのように実行するか
+```
+
+例
+
+```text
+Build
+UnitTest
+Playwright起動
+k6起動
+SBOM生成
+CVE検査
+SAST
+Secret Scan
+License Check
+Container Scan
+IaC Scan
+Deploy
+Notification
+```
+
+---
+
+## アプリケーションリポジトリ
+
+```text
+WHAT
+何を実行するか
+```
+
+例
+
+```text
+Javaソース
+Vueソース
+JUnit
+Playwrightテスト
+k6シナリオ
+DDL
+DML
+Dockerfile
+OpenShift定義
+アプリ固有Shell
+```
+
+---
+
+# 重要な考え方
+
+SBOM、CVE、SAST、ライセンスチェック、機密情報検査は、
+
+```text
+CIのための資材
+```
+
+を要求しているわけではありません。
+
+多くの場合、
+
+```text
+システムを構成するために元々存在する資材
+↓
+それを共通CIが検査する
+```
+
+という関係になります。
+
+例えば
+
+```text
+pom.xml
+```
+
+はビルドのために必要ですが、
+
+同時に
+
+```text
+SCA
+SBOM
+License Check
+CVE
+```
+
+の入力にもなります。
+
+そのため、アプリ側が提供する資材は「1つの資材が複数のCI機能で利用される」と考えるのが正しい設計です。

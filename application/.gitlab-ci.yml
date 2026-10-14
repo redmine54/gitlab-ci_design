@@ -1,0 +1,24 @@
+include:
+  - project: "platform/common-cicd"
+    ref: v1.0.0
+    file: "/common_cicd/50_pipeline_standard.yml"
+
+variables:
+  APP_TYPE: "springboot"
+  FRONTEND_TYPE: "" # TODO: VueまたはReactを選択
+  BACKEND_BUILD_IMAGE: "maven:3.9-eclipse-temurin-21"
+  BACKEND_TEST_IMAGE: "maven:3.9-eclipse-temurin-21"
+  BACKEND_BUILD_CMD: "" # TODO: backendのBuildコマンド
+  BACKEND_TEST_CMD: "" # TODO: backendの単体テストコマンド
+  BACKEND_PACKAGE_PATH: "backend/target/*.jar"
+  FRONTEND_BUILD_IMAGE: "node:22-alpine"
+  FRONTEND_TEST_IMAGE: "node:22-alpine"
+  FRONTEND_BUILD_CMD: "" # TODO: frontendのBuildコマンド
+  FRONTEND_TEST_CMD: "" # TODO: frontendの単体テストコマンド
+  FRONTEND_PACKAGE_PATH: "frontend/dist/**/*"
+  START_CMD: "sh scripts/start_local.sh"
+  HEALTHCHECK_URL: "" # TODO: アプリ起動確認URL
+  E2E_IMAGE: "" # TODO: アプリ実行環境とE2Eツールを含むイメージ
+  E2E_INSTALL_CMD: ""
+  E2E_CMD: "" # TODO: E2Eテストコマンド
+  PERFORMANCE_SCENARIO: "" # TODO: k6シナリオ作成後に設定

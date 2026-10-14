@@ -40,7 +40,8 @@ job実行可否
 ```yaml
 workflow:
   rules:
-    - if: '$CI_COMMIT_TAG'
+    - if: '$CI_COMMIT_TAG == "release"'
+    - if: "$CI_COMMIT_TAG"
     - if: '$CI_COMMIT_BRANCH == "master"'
     - if: '$CI_COMMIT_BRANCH =~ /^feature\/.*/'
     - when: never
@@ -50,7 +51,7 @@ workflow:
 
 ## 4. Branch別実行方針
 
-### feature/*
+### feature/\*
 
 - validate
 - build
@@ -79,6 +80,8 @@ workflow:
 - e2e
 - performance
 - security
+
+タグ名が完全一致で`release`の場合も、masterと同じジョブ条件で実行する。他のタグも従来どおりタグPipelineとして受け付ける。
 
 ---
 
@@ -149,16 +152,16 @@ timeout: 60m
 
 ## 10. Branch別ジョブマトリクス
 
-| Job | feature | master | tag |
-|------|------|------|------|
-| validate | ○ | ○ | ○ |
-| build | ○ | ○ | ○ |
-| unit_test | ○ | ○ | ○ |
-| package | - | ○ | ○ |
-| staging | ○ | ○ | ○ |
-| e2e | ○ | ○ | ○ |
-| performance | - | ○ | ○ |
-| security | - | ○ | ○ |
+| Job         | feature | master | tag |
+| ----------- | ------- | ------ | --- |
+| validate    | ○       | ○      | ○   |
+| build       | ○       | ○      | ○   |
+| unit_test   | ○       | ○      | ○   |
+| package     | -       | ○      | ○   |
+| staging     | ○       | ○      | ○   |
+| e2e         | ○       | ○      | ○   |
+| performance | -       | ○      | ○   |
+| security    | -       | ○      | ○   |
 
 ---
 

@@ -1,0 +1,8 @@
+common-security:
+  stage: security
+  image: $SECURITY_IMAGE
+  rules:
+    - if: '($CI_COMMIT_BRANCH == "master" || $CI_COMMIT_TAG) && $SECURITY_CMD'
+  allow_failure: true
+  script:
+    - sh -c "$SECURITY_CMD"

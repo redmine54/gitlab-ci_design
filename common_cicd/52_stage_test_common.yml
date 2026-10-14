@@ -1,0 +1,15 @@
+common-backend-test:
+  stage: unit_test
+  image: $BACKEND_TEST_IMAGE
+  rules:
+    - if: '($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_TAG || $CI_COMMIT_BRANCH == "master" || $CI_COMMIT_BRANCH =~ /^feature\/.*/) && $BACKEND_TEST_CMD'
+  script:
+    - sh -c "$BACKEND_TEST_CMD"
+
+common-frontend-test:
+  stage: unit_test
+  image: $FRONTEND_TEST_IMAGE
+  rules:
+    - if: '($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_TAG || $CI_COMMIT_BRANCH == "master" || $CI_COMMIT_BRANCH =~ /^feature\/.*/) && $FRONTEND_TEST_CMD'
+  script:
+    - sh -c "$FRONTEND_TEST_CMD"

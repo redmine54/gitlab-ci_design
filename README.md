@@ -16,19 +16,21 @@ GitLab CI/CDを複数のアプリケーションで共通利用するための�
 
 設計資料は、共通方針から個別設計へ進む順に読むことを想定しています。
 
-| ファイル | 内容 |
-| --- | --- |
-| [01_GitLab_CICD_Design_Prompt_v1.1.md](01_GitLab_CICD_Design_Prompt_v1.1.md) | 設計の前提条件、対象範囲、命名規則 |
-| [02_GitLab_CICD_Standard_Design_v1.1.md](02_GitLab_CICD_Standard_Design_v1.1.md) | 標準ステージ、ブランチ別方針、共通原則 |
-| [03_GitLab_CICD_Template_Architecture_v1.0.md](03_GitLab_CICD_Template_Architecture_v1.0.md) | CI/CDテンプレートの構成と責務 |
-| [04_GitLab_CICD_Variables_Design_v1.0.md](04_GitLab_CICD_Variables_Design_v1.0.md) | 利用者・管理者・Secret Variablesの設計 |
-| [05_GitLab_CICD_Rules_Design_v1.0.md](05_GitLab_CICD_Rules_Design_v1.0.md) | workflow、ブランチ、Job実行条件の設計 |
-| [06_GitLab_CICD_Runner_Design_v1.0.md](06_GitLab_CICD_Runner_Design_v1.0.md) | Runner、DooD、キャッシュ、Artifactの設計 |
-| [07_GitLab_CICD_E2E_Design_v1.0.md](07_GitLab_CICD_E2E_Design_v1.0.md) | Runner上で行うアプリ起動、Health Check、Playwright E2Eの設計 |
-| [50−59比較.md](50%E2%88%9259%E6%AF%94%E8%BC%83.md) | 50番台テンプレートと補助スクリプトの一覧 |
-| [scripts_summary.md](scripts_summary.md) | Build／Testスクリプトの概要 |
-| [50_pipeline_standard.yml](50_pipeline_standard.yml) | Pipeline標準設定のYAMLファイル |
-| [.gitlab-ci/GitLab_CICD_Template_Structure_50-59.md](.gitlab-ci/GitLab_CICD_Template_Structure_50-59.md) | テンプレートとスクリプトの配置設計 |
+| ファイル                                                                                                 | 内容                                                         |
+| -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| [01_GitLab_CICD_Design_Prompt_v1.1.md](01_GitLab_CICD_Design_Prompt_v1.1.md)                             | 設計の前提条件、対象範囲、命名規則                           |
+| [02_GitLab_CICD_Standard_Design_v1.1.md](02_GitLab_CICD_Standard_Design_v1.1.md)                         | 標準ステージ、ブランチ別方針、共通原則                       |
+| [03_GitLab_CICD_Template_Architecture_v1.0.md](03_GitLab_CICD_Template_Architecture_v1.0.md)             | CI/CDテンプレートの構成と責務                                |
+| [04_GitLab_CICD_Variables_Design_v1.0.md](04_GitLab_CICD_Variables_Design_v1.0.md)                       | 利用者・管理者・Secret Variablesの設計                       |
+| [05_GitLab_CICD_Rules_Design_v1.0.md](05_GitLab_CICD_Rules_Design_v1.0.md)                               | workflow、ブランチ、Job実行条件の設計                        |
+| [06_GitLab_CICD_Runner_Design_v1.0.md](06_GitLab_CICD_Runner_Design_v1.0.md)                             | Runner、DooD、キャッシュ、Artifactの設計                     |
+| [07_GitLab_CICD_E2E_Design_v1.0.md](07_GitLab_CICD_E2E_Design_v1.0.md)                                   | Runner上で行うアプリ起動、Health Check、Playwright E2Eの設計 |
+| [50−59比較.md](50%E2%88%9259%E6%AF%94%E8%BC%83.md)                                                       | 50番台テンプレートと補助スクリプトの一覧                     |
+| [scripts_summary.md](scripts_summary.md)                                                                 | Build／Testスクリプトの概要                                  |
+| [50_pipeline_standard.yml](50_pipeline_standard.yml)                                                     | Pipeline標準設定のYAMLファイル                               |
+| [.gitlab-ci/GitLab_CICD_Template_Structure_50-59.md](.gitlab-ci/GitLab_CICD_Template_Structure_50-59.md) | テンプレートとスクリプトの配置設計                           |
+| [common_cicd/README.md](common_cicd/README.md)                                                           | Backend／Frontendを別イメージで実行する共通CIテンプレート    |
+| [application/README.md](application/README.md)                                                           | アプリ本体側の未確定プレースホルダー構成                     |
 
 ## ディレクトリ構成
 
@@ -38,6 +40,8 @@ GitLab CI/CDを複数のアプリケーションで共通利用するための�
 ├── 50_pipeline_standard.yml   # Pipeline標準設定
 ├── 50−59比較.md               # テンプレート一覧・比較
 ├── scripts_summary.md         # スクリプト概要
+├── common_cicd/                # 再利用する共通Pipelineテンプレート
+├── application/                # Spring Boot＋Frontendのアプリ側雛形
 └── .gitlab-ci/
     ├── includes/              # 共通Pipeline／Stage定義
     ├── scripts/               # Build、Test、起動、E2E、Deploy等のスクリプト
@@ -57,11 +61,11 @@ validate → build → unit_test → package → staging → e2e → performance
 
 ブランチ／タグによって実行範囲を変えます。
 
-| 対象 | 主な実行内容 |
-| --- | --- |
-| `feature/*` | Validate、Build、Unit Test、Staging、E2E |
-| `master` | 上記にPackage、Performance Test、Security Testを追加 |
-| タグ | リリース候補の検証として、master相当の工程を実行 |
+| 対象        | 主な実行内容                                         |
+| ----------- | ---------------------------------------------------- |
+| `feature/*` | Validate、Build、Unit Test、Staging、E2E             |
+| `master`    | 上記にPackage、Performance Test、Security Testを追加 |
+| タグ        | リリース候補の検証として、master相当の工程を実行     |
 
 具体的なJob条件は設計書とテンプレート定義を正としてください。
 
@@ -69,14 +73,14 @@ validate → build → unit_test → package → staging → e2e → performance
 
 1. 対象プロジェクトに必要なGitLab CI/CD Variablesを設定します。アプリケーション種別やBuild／Testコマンド、成果物パスなどはVariablesで指定します。
 2. 共通テンプレートを利用するプロジェクトでは、`.gitlab-ci.yml` からテンプレートのPipeline定義を `include` します。別プロジェクトから参照する場合は、GitLab上の実際のプロジェクトパスとファイルパスに合わせて `include:project` を設定してください。
-3. `APP_TYPE`、`BUILD_CMD`、`TEST_CMD`、`PACKAGE_PATH`、`START_CMD` などをアプリケーションに合わせて設定します。利用可能な変数と必須条件はVariables設計書を確認してください。
+3. Backend／Frontendごとのイメージ、Build／Testコマンド、成果物パスを設定します。利用可能な変数と必須条件は[common_cicd/README.md](common_cicd/README.md)を確認してください。
 4. featureブランチで基本工程を確認し、master／タグで追加のSecurity・Performance工程を確認します。
 
 テンプレートを同じリポジトリ内で試す場合のinclude例:
 
 ```yaml
 include:
-  - local: '.gitlab-ci/includes/50_pipeline_standard.yml'
+  - local: ".gitlab-ci/includes/50_pipeline_standard.yml"
 ```
 
 実際に参照するファイルパスは、GitLabに登録したテンプレートの配置に合わせてください。

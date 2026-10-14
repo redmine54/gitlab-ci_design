@@ -1,0 +1,81 @@
+.common_pipeline_rules:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_TAG == "release"'
+    - if: "$CI_COMMIT_TAG"
+    - if: '$CI_COMMIT_BRANCH == "master"'
+    - if: '$CI_COMMIT_BRANCH =~ /^feature\/.*/'
+
+common-validate:
+  stage: validate
+  extends: .common_pipeline_rules
+  script:
+    - |
+      if [ -n "$APP_TYPE" ]; then
+        echo "Validating application type: $APP_TYPE"
+      else
+        echo "APP_TYPE is not set" >&2
+        exit 1
+      fi
+      if [ -n "$VALIDATE_CMD" ]; then
+        sh -c "$VALIDATE_CMD"
+      fi
+      if [ -z "$BACKEND_BUILD_CMD$FRONTEND_BUILD_CMD" ]; then
+        echo "Set BACKEND_BUILD_CMD and/or FRONTEND_BUILD_CMD" >&2
+        exit 1
+      fi
+      if [ -n "$BACKEND_BUILD_CMD" ] && [ -z "$BACKEND_PACKAGE_PATH" ]; then
+        echo "BACKEND_PACKAGE_PATH is required when BACKEND_BUILD_CMD is set" >&2
+        exit 1
+      fi
+      if [ -n "$FRONTEND_BUILD_CMD" ] && [ -z "$FRONTEND_PACKAGE_PATH" ]; then
+        echo "FRONTEND_PACKAGE_PATH is required when FRONTEND_BUILD_CMD is set" >&2
+        exit 1
+      fi
+
+common-backend-build:
+  stage: build
+  image: $BACKEND_BUILD_IMAGE
+  rules:
+    - if: '($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_TAG || $CI_COMMIT_BRANCH == "master" || $CI_COMMIT_BRANCH =~ /^feature\/.*/) && $BACKEND_BUILD_CMD'
+  script:
+    - |
+      sh -c "$BACKEND_BUILD_CMD"
+  artifacts:
+    when: always
+    expire_in: 7 days
+    paths:
+      - $BACKEND_PACKAGE_PATH
+
+common-frontend-build:
+  stage: build
+  image: $FRONTEND_BUILD_IMAGE
+  rules:
+    - if: '($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_TAG || $CI_COMMIT_BRANCH == "master" || $CI_COMMIT_BRANCH =~ /^feature\/.*/) && $FRONTEND_BUILD_CMD'
+  script:
+    - sh -c "$FRONTEND_BUILD_CMD"
+  artifacts:
+    when: always
+    expire_in: 7 days
+    paths:
+      - $FRONTEND_PACKAGE_PATH
+
+common-package:
+  stage: package
+  rules:
+    - if: '($CI_COMMIT_BRANCH == "master" || $CI_COMMIT_TAG) && (($BACKEND_BUILD_CMD && $BACKEND_PACKAGE_PATH) || ($FRONTEND_BUILD_CMD && $FRONTEND_PACKAGE_PATH))'
+  dependencies:
+    - common-backend-build
+    - common-frontend-build
+  script:
+    - |
+      found=false
+      for path in $BACKEND_PACKAGE_PATH $FRONTEND_PACKAGE_PATH; do
+        if [ -e "$path" ]; then
+          found=true
+        fi
+      done
+      if [ "$found" != true ]; then
+        echo "No package matched configured package paths" >&2
+        exit 1
+      fi
